@@ -1,0 +1,62 @@
+do $$
+Declare
+	num_atoms int = 2;
+
+	pred_pos float = 0;
+    pred_vel float = 0;
+
+	curr_pos float = 0;
+	prev_step int = 0;
+    curr_vel float = 0;
+    curr_acc float = 0;
+    curr_frc float = 0;
+    
+    spring_constant float = 30;
+    mass float = 0.0026;
+    time_step float = 0.001;
+    init_frc FLOAT = 5; 
+    
+begin
+	-- Clear past tables
+	Drop table atoms;
+    Drop table initAtoms;
+	   
+    -- Initialize atoms table
+    create table atoms (step int, atom int, pos float, vel float, acc float, frc float);
+    
+    -- Give atoms initial forces 
+    Create table init_atoms (step int, atom int, pos float, vel float, acc float, frc float);
+    insert into init_atoms values (0, 0, 0, 0, 0, 1);    
+    insert into init_atoms values (0, 1, 0, 0, 0, 2);
+    insert into init_atoms values (0, 2, 0, 0, 0, 3);
+    
+    -- Copy initial states to atoms table
+    for curr_atom in 0..num_atoms LOOP
+        INSERT INTO atoms
+  			SELECT * FROM init_Atoms where atom = curr_atom;
+  	end loop;
+ 
+    -- Iterate through atoms in each step and update values
+    for curr_step in 1..9 Loop
+        prev_step = curr_step - 1;
+
+        for curr_atom in 0..num_atoms loop
+          -- Retrieve previous values
+          EXECUTE format('SELECT atoms.pos FROM atoms WHERE atom = %s AND step = %s', curr_atom, prev_step) into curr_pos;
+          EXECUTE format('SELECT atoms.vel FROM atoms WHERE atom = %s AND step = %s', curr_atom, prev_step) into curr_vel;
+          EXECUTE format('SELECT atoms.acc FROM atoms WHERE atom = %s AND step = %s', curr_atom, prev_step) into curr_acc;
+          EXECUTE format('SELECT atoms.frc FROM atoms WHERE atom = %s AND step = %s', curr_atom, prev_step) into curr_frc;
+
+          -- Update the values for the current step
+          curr_pos = curr_pos + (curr_vel * time_step);
+          curr_vel = curr_vel + (curr_acc * time_step);
+          curr_acc = curr_frc / mass;
+          curr_frc = (-spring_constant) * curr_pos;
+
+          -- Insert the updated values into the "atoms" table
+          INSERT INTO atoms VALUES (curr_step, curr_atom, curr_pos, curr_vel, curr_acc, curr_frc);
+      	end loop;
+
+    end loop;
+   
+end; $$
