@@ -1,0 +1,23 @@
+DO $$
+
+DECLARE 
+
+    dist FLOAT;
+    curr_frc FLOAT;
+
+BEGIN
+    
+DROP TABLE IF EXISTS forces;
+
+CREATE TABLE forces(dist FLOAT, frc FLOAT);
+
+FOR i in 1..100000 LOOP
+
+    dist = i*0.001;
+    curr_frc = getDerivative(dist);
+
+    INSERT into forces VALUES(dist, curr_frc);
+
+END LOOP;
+
+END; $$

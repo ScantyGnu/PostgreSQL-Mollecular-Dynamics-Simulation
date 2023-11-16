@@ -14,3 +14,40 @@ BEGIN
     RETURN result;
 END; $$
 LANGUAGE PLPGSQL;
+
+
+CREATE OR REPLACE FUNCTION getDerivative(
+    x1 FLOAT
+)
+RETURNS FLOAT AS $$
+DECLARE
+
+    spr_const FLOAT = 0.6; 
+    x2 FLOAT = x1 + 0.1;
+    y1 FLOAT = (spr_const/2)*(x1*x1);
+    y2 FLOAT = (spr_const/2)*(x2*x2);
+    m FLOAT = (y2 - y1) / (x2 - x1);
+
+BEGIN
+    RETURN m;
+END; $$
+LANGUAGE PLPGSQL;
+
+
+CREATE OR REPLACE FUNCTION getFromForces(
+    x FLOAT
+)
+RETURNS FLOAT AS $$
+DECLARE
+
+    result FLOAT;
+    min FLOAT;
+
+BEGIN
+
+    SELECT MIN(ABS(ABS(x) - dist)) FROM forces INTO min;
+    SELECT frc FROM forces WHERE dist = min INTO result;
+    RETURN result;
+
+END; $$
+LANGUAGE PLPGSQL;
