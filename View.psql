@@ -1,0 +1,17 @@
+CREATE VIEW pos0 AS SELECT step, pos FROM atoms WHERE atom = 0; 
+CREATE VIEW pos1 AS SELECT step, pos FROM atoms WHERE atom = 1; 
+CREATE VIEW pos2 AS SELECT step, pos FROM atoms WHERE atom = 2;
+
+CREATE VIEW positions AS SELECT pos0.pos AS pos0, pos1.pos AS pos1, pos2.pos AS pos2 FROM 
+    pos0 INNER JOIN pos1 ON pos0.step = pos1.step 
+    INNER JOIN pos2 ON pos1.step = pos2.step;
+
+CREATE TABLE posTable AS SELECT * FROM positions;
+
+\copy posTable TO 'positions.csv' WITH (FORMAT csv);
+\copy atoms TO 'results.csv' WITH (FORMAT csv);
+
+DROP VIEW positions;
+DROP VIEW pos2;
+DROP VIEW pos1;
+DROP VIEW pos0;
