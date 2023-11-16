@@ -17,42 +17,30 @@ DECLARE
 BEGIN
 	-- Clear past tables
 	DROP TABLE IF EXISTS atoms;
-	DROP TABLE IF EXISTS init_atoms;
-    DROP table if exists frc;
-    DROP TABLE IF EXISTS equilibriums;
+  	DROP TABLE IF EXISTS equilibriums;
 	   
 	-- Initialize atoms table
 	CREATE TABLE atoms (step INT, atom INT, pos FLOAT, vel FLOAT, acc FLOAT, frc FLOAT, mass FLOAT);
-
-	-- Give atoms initial forces 
-	CREATE TABLE init_atoms (step INT, atom INT, pos FLOAT, vel FLOAT, acc FLOAT, frc FLOAT, mass FLOAT);
-	INSERT INTO init_atoms VALUES (0, 0, 0, 0, 0, 0, 0.26);    
-	INSERT INTO init_atoms VALUES (0, 1, 2, 0, 0, 0, 500);
-    INSERT INTO init_atoms VALUES (0, 2, 4, 0, 0, 0, 0.26);
+	INSERT INTO atoms VALUES (0, 0, 0, 0, 0, 0, 0.26);    
+	INSERT INTO atoms VALUES (0, 1, 2, 0, 0, 0, 500);
+    INSERT INTO atoms VALUES (0, 2, 4, 0, 0, 0, 0.26);
     
     CREATE TABLE equilibriums (atom FLOAT, atom0 FLOAT, atom1 FLOAT, atom2 FLOAT);
     INSERT INTO equilibriums VALUES (0, NULL, 1, 2);
     INSERT INTO equilibriums VALUES (1, -1, NULL, 1);
 	INSERT INTO equilibriums VALUES (2, -2, -1, NULL);
-        
-	-- Copy initial states to atoms table
-	FOR curr_atom IN 0..num_atoms LOOP
-	INSERT INTO atoms
-  		SELECT * FROM init_Atoms WHERE atom = curr_atom;
-  	END LOOP;
- 
-	-- Iterate through atoms in each step and update values
-	FOR curr_step IN 1..1000 LOOP
-    		prev_step = curr_step - 1;
 
+	-- Iterate through atoms in each step and update values
+	FOR curr_step IN 1..4000 LOOP
+	    	prev_step = curr_step - 1;
 			-- Update position, velocity and acceleration for the current step
         	FOR curr_atom IN 0..num_atoms LOOP
         			-- Retrieve previous values
-        			EXECUTE FORMAT('SELECT atoms.pos FROM atoms WHERE atom = %s AND step = %s', curr_atom, prev_step) INTO curr_pos;
-        			EXECUTE FORMAT('SELECT atoms.vel FROM atoms WHERE atom = %s AND step = %s', curr_atom, prev_step) INTO curr_vel;
-        			EXECUTE FORMAT('SELECT atoms.acc FROM atoms WHERE atom = %s AND step = %s', curr_atom, prev_step) INTO curr_acc;
-            		EXECUTE FORMAT('SELECT atoms.frc FROM atoms WHERE atom = %s AND step = %s', curr_atom, prev_step) INTO curr_frc;
-                	EXECUTE FORMAT('SELECT atoms.mass FROM atoms WHERE atom = %s AND step = %s', curr_atom, prev_step) INTO curr_mass;
+					curr_pos = getFromAtoms(curr_atom, 'pos', prev_step);
+					curr_vel = getFromAtoms(curr_atom, 'vel', prev_step);
+					curr_acc = getFromAtoms(curr_atom, 'acc', prev_step);
+					curr_frc = getFromAtoms(curr_atom, 'frc', prev_step);
+					curr_mass = getFromAtoms(curr_atom, 'mass', prev_step);
 
 					-- Update the values for the current step
 					curr_pos = curr_pos + (curr_vel * time_step);
@@ -67,7 +55,7 @@ BEGIN
            	FOR curr_atom IN 0..num_atoms LOOP
             
 					curr_frc = 0;
-                    EXECUTE FORMAT('SELECT atoms.pos FROM atoms WHERE atom = %s AND step = %s', curr_atom, prev_step) INTO curr_pos;
+					curr_pos = getFromAtoms(curr_atom, 'pos', prev_step);
 					
                     FOR other_atom IN 0..num_atoms LOOP
 							IF other_atom = curr_atom THEN
@@ -76,7 +64,7 @@ BEGIN
 							
                             
                             -- get values of other atom and their equilibrium
-							EXECUTE FORMAT('SELECT atoms.pos FROM atoms WHERE atom = %s AND step = %s', other_atom, prev_step) INTO other_pos;
+							other_pos = getFromAtoms(other_atom, 'pos', prev_step);
 							EXECUTE FORMAT('SELECT equilibriums.atom%s FROM equilibriums WHERE atom = %s', other_atom, curr_atom) INTO equilibrium; 
 							
                             -- Add force to the atom's current force based on how far away it is from equilibrium

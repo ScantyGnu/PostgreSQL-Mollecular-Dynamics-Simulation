@@ -1,0 +1,16 @@
+CREATE OR REPLACE FUNCTION getFromAtoms(
+    atomId INT,
+    attName VARCHAR(100),
+    step INT)
+RETURNS FLOAT AS $$
+DECLARE 
+
+    atom VARCHAR(5) = atomId::VARCHAR(5);
+    stepChar VARCHAR(5) = step::VARCHAR(5);
+    result FLOAT;
+
+BEGIN
+    EXECUTE FORMAT('SELECT atoms.%s FROM atoms WHERE atom = %s AND step = %s', attName, atom, stepChar) INTO result;
+    RETURN result;
+END; $$
+LANGUAGE PLPGSQL;
