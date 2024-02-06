@@ -2,10 +2,13 @@ DO $$
 DECLARE
 	num_atoms INT = 2;
 
+	curr_const FLOAT = 0;
+
 	curr_pos FLOAT = 0;
 	prev_step INT = 0;
 	curr_vel FLOAT = 0;
 	curr_acc FLOAT = 0;
+	curr_jerk FLOAT = 0;
 	curr_frc FLOAT = 0;
     curr_mass FLOAT = 0;
     
@@ -18,17 +21,34 @@ BEGIN
 	-- Clear past tables
 	DROP TABLE IF EXISTS atoms;
   	DROP TABLE IF EXISTS equilibriums;
-	   
+	DROP TABLE IF EXISTS sConstants;
+	DROP TABLE IF EXISTS unique_const;
+
 	-- Initialize atoms table
-	CREATE TABLE atoms (step INT, atom INT, pos FLOAT, vel FLOAT, acc FLOAT, frc FLOAT, mass FLOAT);
-	INSERT INTO atoms VALUES (0, 0, 0, 0, 0, 0, 0.26);    
-	INSERT INTO atoms VALUES (0, 1, 2, 0, 0, 0, 500);
-    INSERT INTO atoms VALUES (0, 2, 4, 0, 0, 0, 0.26);
+	CREATE TABLE atoms (step INT NOT NULL, atom INT NOT NULL, pos FLOAT NOT NULL, vel FLOAT NOT NULL, acc FLOAT NOT NULL, frc FLOAT NOT NULL, mass FLOAT NOT NULL, jerk FLOAT NOT NULL);
+	INSERT INTO atoms VALUES (0, 0, 0, 0, 0, 0, 0.26, 0);    
+	INSERT INTO atoms VALUES (0, 1, 2, 0, 0, 0, 500, 0);
+    INSERT INTO atoms VALUES (0, 2, 4, 0, 0, 0, 0.26, 0);
     
+	-- Initialize equilibriums for atom relations
     CREATE TABLE equilibriums (atom FLOAT, atom0 FLOAT, atom1 FLOAT, atom2 FLOAT);
     INSERT INTO equilibriums VALUES (0, NULL, 1, 2);
     INSERT INTO equilibriums VALUES (1, -1, NULL, 1);
 	INSERT INTO equilibriums VALUES (2, -2, -1, NULL);
+
+	-- Unique spring constant values used to create derivative tables
+	CREATE TABLE unique_const (index FLOAT, const FLOAT);
+	INSERT INTO unique_const VALUES (1, 20);
+	INSERT INTO unique_const VALUES (2, 30);
+	
+	-- Spring constants for atom relations
+	CREATE TABLE sConstants (atom FLOAT, atom0 FLOAT, atom1 FLOAT, atom2 FLOAT);
+	INSERT INTO sConstants VALUES (0, NULL, 20, 30);
+	INSERT INTO sConstants VALUES (1, 20, NULL, 20);
+	INSERT INTO sConstants VALUES (2, 30, 20, NULL);
+
+	-- Create deriv tables, one for each unique spring constant
+	CALL createDerivTables(100000, 0.001);
 
 	-- Iterate through atoms in each step and update values
 	FOR curr_step IN 1..4000 LOOP
@@ -41,14 +61,16 @@ BEGIN
 					curr_acc = getFromAtoms(curr_atom, 'acc', prev_step);
 					curr_frc = getFromAtoms(curr_atom, 'frc', prev_step);
 					curr_mass = getFromAtoms(curr_atom, 'mass', prev_step);
+					curr_jerk = getFromAtoms(curr_atom, 'jerk', prev_step);
 
 					-- Update the values for the current step
-					curr_pos = curr_pos + (curr_vel * time_step);
-					curr_vel = curr_vel + (curr_acc * time_step);
-					curr_acc = curr_frc / curr_mass;
+					curr_pos = curr_pos + (1/6)*curr_jerk*(time_step^3) + (1/2)*curr_acc*(time_step^2) + curr_vel*time_step;
+					curr_vel = curr_vel + (1/2)*curr_jerk*(time_step^2) + curr_acc*time_step;
+					curr_jerk = ((curr_frc / curr_mass) - curr_acc) / time_step;
+					curr_acc = (curr_frc / curr_mass);
               
 					-- Insert the updated values into the "atoms" table
-					INSERT INTO atoms VALUES (curr_step, curr_atom, curr_pos, curr_vel, curr_acc, curr_frc, curr_mass);
+					INSERT INTO atoms VALUES (curr_step, curr_atom, curr_pos, curr_vel, curr_acc, curr_frc, curr_mass, curr_jerk);
 			END LOOP;
             
             -- Update forces of atoms in current step
@@ -66,10 +88,11 @@ BEGIN
                             -- get values of other atom and their equilibrium
 							other_pos = getFromAtoms(other_atom, 'pos', prev_step);
 							EXECUTE FORMAT('SELECT equilibriums.atom%s FROM equilibriums WHERE atom = %s', other_atom, curr_atom) INTO equilibrium; 
-							
+							EXECUTE FORMAT('SELECT sConstants.atom%s FROM sConstants WHERE atom = %s', other_atom, curr_atom) INTO curr_const;
+
                             -- Add force to the atom's current force based on how far away it is from equilibrium
-							curr_frc = curr_frc + (-spring_constant) * (equilibrium - (other_pos - curr_pos));
-							
+							curr_frc = curr_frc + getFromForces(equilibrium - (other_pos - curr_pos), curr_const);
+
 					END LOOP;
 
 					-- Update force in current step to the new force
