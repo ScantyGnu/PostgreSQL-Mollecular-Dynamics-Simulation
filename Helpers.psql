@@ -1,3 +1,10 @@
+-- Retrieve attribute @attName from atom @atomID in step @step from atoms table
+-- Input:
+-- atomID (INT) - id of atom to be retrieved from 
+-- attName (VARCHAR(100)) - name of attribute to be retrieved
+-- step (INT) - step of simulation to retrieve from  
+-- Returns: FLOAT value of the attribute specified
+
 CREATE OR REPLACE FUNCTION getFromAtoms(
     atomId INT,
     attName VARCHAR(100),
@@ -16,13 +23,19 @@ END; $$
 LANGUAGE PLPGSQL;
 
 
+-- Calculates potential energy using the derivative of hooke's law ((1/2)kx^2) for distances @x1 and @x1 + 0.1 and @spr_const
+-- Input:
+-- x1 (FLOAT) - the distance at which we want to know the potential
+-- spr_const - spring constant for hooke's law
+-- Returns: A float representing the potential energy at a point @x1
+
 CREATE OR REPLACE FUNCTION getDerivative(
-    x1 FLOAT
+    x1 FLOAT,
+    spr_const FLOAT
 )
 RETURNS FLOAT AS $$
 DECLARE
 
-    spr_const FLOAT = 0.6; 
     x2 FLOAT = x1 + 0.1;
     y1 FLOAT = (spr_const/2)*(x1*x1);
     y2 FLOAT = (spr_const/2)*(x2*x2);
@@ -34,20 +47,67 @@ END; $$
 LANGUAGE PLPGSQL;
 
 
+-- Retrieve force float from forces table corresponding to distance @x from equilibrium with a spring constant @const
+-- Input: 
+-- x (FLOAT) - distance from equilibrium
+-- const (FLOAT) - spring constant
+-- Returns: A float representing the force at the distance (closest in our table) specified
+
 CREATE OR REPLACE FUNCTION getFromForces(
-    x FLOAT
+    x FLOAT,
+    const FLOAT
 )
 RETURNS FLOAT AS $$
 DECLARE
 
     result FLOAT;
-    min FLOAT;
 
 BEGIN
 
-    SELECT MIN(ABS(ABS(x) - dist)) FROM forces INTO min;
-    SELECT frc FROM forces WHERE dist = min INTO result;
+    SELECT frc FROM forces WHERE dist = ROUND(ABS(x)::numeric, 3) AND s_const = const INTO result;
+    IF x > 0 THEN
+        result = -result;
+	END IF;
     RETURN result;
+
+END; $$
+LANGUAGE PLPGSQL;
+
+
+-- Creates forces table with derivatives for all distances starting at 0 with a step of @dist_step over @size steps.
+-- the unique_const table with all the unique instances of spring constants is used to calculate multiple versions of the force table.
+-- This also creates an index on teh forces table.
+-- Input:
+-- size (INT) - number of steps to calculate derivative for
+-- dist_step - increase for the distance in each step
+
+CREATE OR REPLACE PROCEDURE createDerivTables(
+    size INT,
+    dist_step FLOAT
+)
+AS $$ DECLARE 
+
+    dist FLOAT;
+    curr_frc FLOAT;
+    num_const FLOAT;
+    curr_const FLOAT;
+
+BEGIN
+    DROP TABLE IF EXISTS forces;
+    CREATE TABLE forces(s_const FLOAT, dist FLOAT, frc FLOAT);
+    SELECT COUNT(const) FROM unique_const INTO num_const;
+
+    FOR i IN 1..num_const LOOP
+        SELECT const FROM unique_const WHERE index = i INTO curr_const;
+        INSERT INTO forces VALUES (curr_const, 0, 0);
+        FOR j in 1..100000 LOOP
+            dist = j*0.001;
+            curr_frc = getDerivative(dist, curr_const);
+            INSERT INTO forces VALUES (curr_const, dist, curr_frc);
+        END LOOP;
+    END LOOP;
+
+    CREATE INDEX ON forces USING HASH(dist);
 
 END; $$
 LANGUAGE PLPGSQL;
