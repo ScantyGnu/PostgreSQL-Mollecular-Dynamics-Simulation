@@ -2,16 +2,32 @@ CREATE VIEW pos0 AS SELECT step, pos FROM atoms WHERE atom = 0;
 CREATE VIEW pos1 AS SELECT step, pos FROM atoms WHERE atom = 1; 
 CREATE VIEW pos2 AS SELECT step, pos FROM atoms WHERE atom = 2;
 
+CREATE VIEW jerk0 AS SELECT step, jerk FROM atoms WHERE atom = 0; 
+CREATE VIEW jerk1 AS SELECT step, jerk FROM atoms WHERE atom = 1; 
+CREATE VIEW jerk2 AS SELECT step, jerk FROM atoms WHERE atom = 2;
+
 CREATE VIEW positions AS SELECT pos0.pos AS pos0, pos1.pos AS pos1, pos2.pos AS pos2 FROM 
     pos0 INNER JOIN pos1 ON pos0.step = pos1.step 
     INNER JOIN pos2 ON pos1.step = pos2.step;
 
+CREATE VIEW jerks AS SELECT jerk0.jerk AS jerk0, jerk1.jerk AS jerk1, jerk2.jerk AS jerk2 FROM 
+    jerk0 INNER JOIN jerk1 ON jerk0.step = jerk1.step
+    INNER JOIN jerk2 ON jerk1.step = jerk2.step;
+
+CREATE TABLE jerktable AS SELECT * FROM jerks;
 CREATE TABLE posTable AS SELECT * FROM positions;
 
 \copy posTable TO 'positions.csv' WITH (FORMAT csv);
 \copy atoms TO 'results.csv' WITH (FORMAT csv);
+\copy jerktable TO 'jerk.csv' WITH (FORMAT csv);
 
 DROP VIEW positions;
 DROP VIEW pos2;
 DROP VIEW pos1;
 DROP VIEW pos0;
+DROP TABLE posTable;
+DROP VIEW jerks;
+DROP VIEW jerk2;
+DROP VIEW jerk1;
+DROP VIEW jerk0;
+DROP TABLE jerktable;

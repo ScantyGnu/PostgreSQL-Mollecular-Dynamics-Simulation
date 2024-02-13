@@ -91,7 +91,7 @@ BEGIN
 							EXECUTE FORMAT('SELECT sConstants.atom%s FROM sConstants WHERE atom = %s', other_atom, curr_atom) INTO curr_const;
 
                             -- Add force to the atom's current force based on how far away it is from equilibrium
-							curr_frc = curr_frc + getFromForces(equilibrium - (other_pos - curr_pos), curr_const);
+							curr_frc = curr_frc + (-curr_const*(equilibrium - (other_pos - curr_pos)));
 
 					END LOOP;
 
